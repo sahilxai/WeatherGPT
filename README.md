@@ -109,6 +109,18 @@ npm run dev
 
 ---
 
+### 🐳 Alternative: 1-Command Run with Docker
+
+If you have Docker installed, you can spin up the full stack (FastAPI Backend + React Frontend) with a single command:
+
+```bash
+docker compose up --build
+```
+- **Frontend App:** [http://localhost:5173](http://localhost:5173)
+- **Backend API Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
 ## 🖥️ How to Use WeatherGPT
 
 1. Open **[http://localhost:5173](http://localhost:5173)** in your browser.
