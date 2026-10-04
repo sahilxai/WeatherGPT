@@ -1,25 +1,19 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { 
   X, 
-  BarChart3, 
+  Printer, 
+  Copy, 
+  Check, 
   MapPin, 
-  AlertTriangle, 
-  ShieldCheck, 
   FileText, 
-  CheckCircle2, 
-  Sparkles,
-  TrendingUp,
-  Download,
-  Share2,
-  Wind,
-  Thermometer,
-  Shield,
-  Activity,
-  Database,
-  Check,
-  RefreshCw
+  Calendar, 
+  Thermometer, 
+  Droplets, 
+  Wind, 
+  ShieldAlert,
+  Compass
 } from 'lucide-react';
-import { saveAnalysisReportToSupabase } from '../services/api';
 
 export function AnalysisModal({ 
   isOpen, 
@@ -27,259 +21,235 @@ export function AnalysisModal({
   messages = [], 
   locationHistory = [] 
 }) {
-  const [savingSupabase, setSavingSupabase] = useState(false);
-  const [supabaseMsg, setSupabaseMsg] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
-  // Calculate statistics from user session
-  const userMessages = messages.filter(m => m.role === 'user');
-  const totalQueries = userMessages.length;
-  
-  // Categorize queries
-  const weatherQueries = userMessages.filter(m => 
-    /weather|temperature|temp|rain|wind|forecast|climate|humid/i.test(m.content)
-  ).length;
+  // Group messages into paired Q&A turns
+  const qaPairs = [];
+  let currentPair = null;
 
-  const disasterQueries = userMessages.filter(m => 
-    /disaster|flood|cyclone|hurricane|earthquake|emergency|evacuate|safety|kit|tsunami|hazard/i.test(m.content)
-  ).length;
+  messages.forEach((msg) => {
+    if (msg.role === 'user') {
+      currentPair = {
+        question: msg.content,
+        timestamp: msg.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        answers: []
+      };
+      qaPairs.push(currentPair);
+    } else if (msg.role === 'assistant' && currentPair) {
+      currentPair.answers.push({
+        content: msg.content,
+        location: msg.location,
+        tools_used: msg.tools_used || [],
+        timestamp: msg.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+    }
+  });
 
-  // Collect all warnings from location history
-  const allWarnings = locationHistory.flatMap(loc => loc.warnings || []);
   const uniqueCities = Array.from(new Set(locationHistory.map(l => l.city)));
-
-  // Calculate preparedness score (0 - 100)
-  const baseScore = 75;
-  const bonusRAG = Math.min(disasterQueries * 8, 15);
-  const bonusExploration = Math.min(uniqueCities.length * 5, 10);
-  const preparednessScore = Math.min(baseScore + bonusRAG + bonusExploration, 100);
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleSaveToSupabase = async () => {
-    setSavingSupabase(true);
-    setSupabaseMsg(null);
-    try {
-      const payload = {
-        session_id: `session-${Date.now()}`,
-        preparedness_score: preparednessScore,
-        total_queries: totalQueries,
-        disaster_queries: disasterQueries,
-        unique_cities: uniqueCities,
-        all_warnings: allWarnings,
-        report_metadata: {
-          timestamp: new Date().toISOString(),
-          weather_queries: weatherQueries
+  const handleCopyAll = () => {
+    let reportText = `WEATHERGPT SESSION BRIEFING & REPORT\nDate: ${currentDate}\nTotal Queries: ${qaPairs.length}\nRegions Mapped: ${uniqueCities.join(', ') || 'None'}\n\n`;
+    reportText += `====================================================\n\n`;
+
+    qaPairs.forEach((pair, idx) => {
+      reportText += `[Q${idx + 1}] (${pair.timestamp}): ${pair.question}\n`;
+      pair.answers.forEach((ans) => {
+        if (ans.location) {
+          reportText += `--> Station: ${ans.location.city}${ans.location.country ? `, ${ans.location.country}` : ''}\n`;
+          reportText += `--> Telemetry: ${ans.location.temp ?? 'N/A'}°C | ${ans.location.condition || ans.location.description} | Humidity: ${ans.location.humidity ?? 'N/A'}% | Wind: ${ans.location.wind_speed ?? 'N/A'} m/s\n`;
         }
-      };
-      await saveAnalysisReportToSupabase(payload);
-      setSupabaseMsg({ type: 'success', text: 'Saved to Supabase!' });
-      setTimeout(() => setSupabaseMsg(null), 4000);
-    } catch (err) {
-      setSupabaseMsg({
-        type: 'error',
-        text: err.response?.data?.detail || err.message || 'Supabase credentials needed in .env'
+        reportText += `--> Response: ${ans.content}\n\n`;
       });
-      setTimeout(() => setSupabaseMsg(null), 5000);
-    } finally {
-      setSavingSupabase(false);
-    }
+      reportText += `----------------------------------------------------\n\n`;
+    });
+
+    navigator.clipboard.writeText(reportText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto glass-panel-elevated rounded-2xl shadow-2xl border border-cyan-500/40 text-slate-100 flex flex-col">
-        {/* Modal Header */}
-        <div className="p-5 border-b border-slate-700/60 flex items-center justify-between bg-dark-900/80 sticky top-0 backdrop-blur-xl z-10">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in select-none">
+      <div 
+        id="weathergpt-printable-report"
+        className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl text-slate-100 flex flex-col print:max-h-none print:shadow-none print:border-none print:bg-white print:text-black print:rounded-none"
+      >
+        {/* Header */}
+        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 sticky top-0 backdrop-blur-md z-10 print:static print:bg-transparent print:border-b-2 print:border-black">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white shadow-glow-cyan">
-              <BarChart3 className="w-5 h-5" />
+            <div className="p-2 sm:p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 print:hidden">
+              <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-white flex items-center gap-2 tracking-tight">
-                Meteorological & Disaster Intelligence Briefing
+              <h2 className="text-sm sm:text-base font-bold text-white tracking-tight print:text-black">
+                WeatherGPT Session Briefing & Q&A Report
               </h2>
-              <p className="text-xs text-slate-400">
-                Session telemetry, atmospheric monitoring, and disaster risk index
+              <p className="text-[11px] text-slate-400 print:text-gray-600 flex items-center gap-2 mt-0.5">
+                <Calendar className="w-3 h-3 text-cyan-400 print:hidden" />
+                <span>{currentDate}</span>
+                <span>•</span>
+                <span>{qaPairs.length} Inquiries Answered</span>
               </p>
             </div>
           </div>
+
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700 active:scale-95"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors print:hidden"
+            title="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 space-y-6 select-text">
-          {/* Top Score & Metric Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Total Queries */}
-            <div className="glass-card p-3.5 rounded-xl border border-slate-700/60">
-              <span className="text-[11px] text-slate-400 font-medium block">Total Inquiries</span>
-              <span className="text-2xl font-black text-cyan-400 font-mono">{totalQueries}</span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">Session prompts</span>
+        {/* Report Content */}
+        <div className="p-4 sm:p-6 space-y-4 select-text print:p-2">
+          {/* Summary Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs print:bg-gray-100 print:border-gray-300 print:text-black">
+            <div>
+              <span className="text-[10px] text-slate-400 block print:text-gray-500">Inquiries Answered</span>
+              <strong className="text-sm sm:text-base text-cyan-400 font-mono print:text-black">{qaPairs.length}</strong>
             </div>
-
-            {/* Explored Locations */}
-            <div className="glass-card p-3.5 rounded-xl border border-slate-700/60">
-              <span className="text-[11px] text-slate-400 font-medium block">Geocoded Stations</span>
-              <span className="text-2xl font-black text-blue-400 font-mono">{uniqueCities.length}</span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">Mapped on Leaflet</span>
+            <div>
+              <span className="text-[10px] text-slate-400 block print:text-gray-500">Stations Monitored</span>
+              <strong className="text-sm sm:text-base text-cyan-400 font-mono print:text-black">{uniqueCities.length}</strong>
             </div>
-
-            {/* RAG Protocols */}
-            <div className="glass-card p-3.5 rounded-xl border border-slate-700/60">
-              <span className="text-[11px] text-slate-400 font-medium block">Disaster Protocols</span>
-              <span className="text-2xl font-black text-emerald-400 font-mono">{disasterQueries}</span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">Vector RAG retrieved</span>
-            </div>
-
-            {/* Preparedness Score */}
-            <div className="glass-card p-3.5 rounded-xl border border-slate-700/60">
-              <span className="text-[11px] text-slate-400 font-medium block">Preparedness Index</span>
-              <span className="text-2xl font-black text-purple-400 font-mono">{preparednessScore}%</span>
-              <span className="text-[10px] text-emerald-400 flex items-center gap-0.5 mt-0.5 font-medium">
-                <TrendingUp className="w-2.5 h-2.5" /> High Readiness
-              </span>
+            <div className="col-span-2 sm:col-span-1">
+              <span className="text-[10px] text-slate-400 block print:text-gray-500">Session Status</span>
+              <strong className="text-xs text-emerald-400 font-medium flex items-center gap-1 mt-0.5 print:text-green-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 print:hidden" />
+                Complete Transcript
+              </strong>
             </div>
           </div>
 
-          {/* AI Executive Summary Card */}
-          <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-950/40 via-dark-900 to-blue-950/30 border border-cyan-500/30 shadow-inner">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5 mb-2">
-              <Sparkles className="w-4 h-4 text-cyan-300" />
-              AI Synthesized Mission Assessment
-            </h3>
-            <p className="text-xs text-slate-300 leading-relaxed font-sans">
-              {totalQueries === 0 ? (
-                "Session active. Inquire about city weather (e.g. 'Weather in Pune') or emergency safety protocols to populate real-time regional telemetry and build your disaster risk profile."
-              ) : (
-                `Session has monitored ${totalQueries} interactions (${weatherQueries} weather observations, ${disasterQueries} disaster emergency protocols). The system has geocoded and rendered ${uniqueCities.length} meteorological regions with dynamic Leaflet coordinate mapping. Current emergency readiness score: ${preparednessScore}%.`
-              )}
-            </p>
-          </div>
-
-          {/* Explored Locations Breakdown */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-                Active Target Stations ({uniqueCities.length})
-              </span>
-              <span className="text-[10px] text-slate-400 font-normal">Real-Time Coordinates</span>
-            </h4>
-            {locationHistory.length === 0 ? (
-              <p className="text-xs text-slate-400 italic bg-dark-950/60 p-3 rounded-xl border border-slate-800 text-center">
-                No stations mapped yet. Ask about any city in the chat interface!
+          {/* Q&A List */}
+          {qaPairs.length === 0 ? (
+            <div className="py-10 text-center space-y-2">
+              <FileText className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-xs font-semibold text-slate-300">No questions asked in this session yet.</p>
+              <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                Ask about current weather in any city or emergency guidelines in the chat, and your questions and answers will automatically appear here!
               </p>
-            ) : (
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                {locationHistory.map((loc, i) => (
-                  <div 
-                    key={i} 
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-dark-950/70 border border-slate-800 text-xs hover:border-cyan-500/40 transition-colors"
-                  >
-                    <span className="font-bold text-white flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-glow-cyan" />
-                      {loc.city} {loc.country ? `(${loc.country})` : ''}
-                    </span>
-                    <span className="font-mono text-slate-400 text-[11px]">
-                      {loc.lat.toFixed(2)}° N, {loc.lon.toFixed(2)}° E
-                    </span>
-                    <span className="text-cyan-300 font-mono font-bold">
-                      {loc.temp !== null && loc.temp !== undefined ? `${loc.temp}°C` : 'Indexed'}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {qaPairs.map((pair, idx) => (
+                <div 
+                  key={idx}
+                  className="rounded-xl p-3.5 sm:p-4 bg-slate-950/40 border border-slate-800 space-y-3 print:bg-transparent print:border-b print:border-gray-300 print:p-2"
+                >
+                  {/* User Question */}
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-800/80 pb-2 print:border-gray-200">
+                    <div className="flex items-start gap-2">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 font-mono print:bg-gray-200 print:text-black shrink-0">
+                        Q{idx + 1}
+                      </span>
+                      <h3 className="text-xs sm:text-sm font-semibold text-white tracking-tight print:text-black">
+                        {pair.question}
+                      </h3>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono shrink-0 print:text-gray-500">
+                      {pair.timestamp}
                     </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Active Hazards / Warnings Section */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-              Atmospheric Hazard & Disaster Alert Matrix
-            </h4>
-            {allWarnings.length === 0 ? (
-              <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>No severe atmospheric hazards (gale winds, heatwave warnings, or flash flood advisories) currently active in probed zones.</span>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {allWarnings.map((warn, i) => (
-                  <div key={i} className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/40 text-rose-300 text-xs flex items-start gap-2.5 shadow-md">
-                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                    <span className="leading-relaxed">{warn}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  {/* Assistant Answer(s) */}
+                  {pair.answers.map((ans, aIdx) => (
+                    <div key={aIdx} className="space-y-2 pl-1 sm:pl-2">
+                      {/* If Weather Station Data present, show clean metadata strip */}
+                      {ans.location && (
+                        <div className="p-2 sm:p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] flex flex-wrap items-center justify-between gap-2 print:bg-gray-50 print:border-gray-300 print:text-black">
+                          <div className="flex items-center gap-1.5 font-bold text-white print:text-black">
+                            <MapPin className="w-3.5 h-3.5 text-cyan-400 print:hidden" />
+                            <span>{ans.location.city}{ans.location.country ? `, ${ans.location.country}` : ''}</span>
+                          </div>
+                          <div className="flex items-center gap-3 font-mono text-[11px] text-slate-300 print:text-black">
+                            {ans.location.temp !== null && ans.location.temp !== undefined && (
+                              <span className="text-cyan-400 font-bold print:text-black">{ans.location.temp}°C</span>
+                            )}
+                            {ans.location.condition && (
+                              <span className="text-slate-400 capitalize print:text-black">{ans.location.condition}</span>
+                            )}
+                            {ans.location.humidity !== null && (
+                              <span className="hidden sm:inline">Hum: {ans.location.humidity}%</span>
+                            )}
+                            {ans.location.wind_speed !== null && (
+                              <span className="hidden sm:inline">Wind: {ans.location.wind_speed} m/s</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
-          {/* Actionable Preparedness Checklist */}
-          <div className="p-4 rounded-xl bg-dark-950/80 border border-slate-800/80 space-y-2.5">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-              <Shield className="w-4 h-4 text-cyan-400" />
-              Disaster Preparedness Protocol Directives
-            </h4>
-            <ul className="text-xs text-slate-300 space-y-2 font-sans">
-              <li className="flex items-start gap-2.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                <span><strong>72-Hour Survival Kit:</strong> Keep 4 liters of clean potable water per person/day, non-perishable rations, flashlight, and medical pack.</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                <span><strong>Flood Hazard Protocol:</strong> Never drive or wade through standing floodwaters (&quot;Turn Around, Don&apos;t Drown&quot;). De-energize main electrical breaker if water enters premises.</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                <span><strong>Cyclone Preparedness:</strong> Secure or shutter all loose windows and external fixtures; remain in an interior ground-floor room away from glass.</span>
-              </li>
-            </ul>
-          </div>
+                      {/* Warnings if any */}
+                      {ans.location?.warnings && ans.location.warnings.length > 0 && (
+                        <div className="p-2 rounded-lg bg-amber-950/30 border border-amber-500/40 text-amber-200 text-xs space-y-1 print:text-red-700 print:border-red-400">
+                          {ans.location.warnings.map((w, wI) => (
+                            <p key={wI} className="leading-snug">{w}</p>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Answer Narrative / Text */}
+                      <div className="prose prose-invert prose-xs sm:prose-sm max-w-none text-slate-300 leading-relaxed font-sans print:text-black print:prose">
+                        <ReactMarkdown>{ans.content}</ReactMarkdown>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-800 bg-dark-950/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3">
+        <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-slate-950/90 backdrop-blur-md flex items-center justify-between gap-2 shrink-0 print:hidden">
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700 transition-colors"
+              disabled={qaPairs.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-cyan-950"
             >
-              <Download className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Print Briefing</span>
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print / Save PDF</span>
             </button>
+
             <button
-              onClick={handleSaveToSupabase}
-              disabled={savingSupabase}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-300 hover:text-white bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 transition-colors"
+              onClick={handleCopyAll}
+              disabled={qaPairs.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {savingSupabase ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-300 font-semibold">Copied!</span>
+                </>
               ) : (
-                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Copy Text</span>
+                </>
               )}
-              <span>{savingSupabase ? 'Saving...' : 'Sync to Supabase'}</span>
             </button>
-            {supabaseMsg && (
-              <span className={`text-[11px] font-medium ${supabaseMsg.type === 'success' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {supabaseMsg.text}
-              </span>
-            )}
           </div>
+
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 transition-all shadow-md shadow-cyan-500/20 active:scale-95"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
           >
-            Acknowledge & Close
+            Close
           </button>
         </div>
       </div>

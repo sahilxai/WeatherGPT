@@ -173,9 +173,16 @@
   border: none;
 }
 
-/* Sleek OSM Dark Mode Tile Filter */
-.osm-dark-tiles {
-  filter: invert(100%) hue-rotate(180deg) brightness(88%) contrast(115%) saturate(50%) !important;
+/* GPU Hardware Acceleration for smooth 60fps/120fps mobile dual view */
+.leaflet-container {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.pulse-marker-ring,
+.pulse-marker-ring-inner {
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
 /* Radar Scan line simulation */
@@ -190,6 +197,7 @@
   border-radius: 50%;
   animation: radarRotate 6s linear infinite;
   pointer-events: none;
+  will-change: transform;
 }
 
 @keyframes radarRotate {
@@ -198,5 +206,22 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Print Optimization for Q&A Session Report */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  
+  /* Hide interactive app background during print */
+  #root > div:not(.fixed) {
+    display: none !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
   }
 }
