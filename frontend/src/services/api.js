@@ -1,30 +1,59 @@
 import axios from 'axios';
 
+// Live production backend hosted on Render
+export const PRODUCTION_DEFAULT_BACKEND = 'https://weathergpt-backend-y16k.onrender.com';
+
+/**
+ * Strips common paths accidentally copied by users from Swagger docs or URLs
+ * e.g., /docs, /redoc, /api, /health, /openapi.json, and trailing slashes.
+ */
+export const sanitizeApiUrl = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  let clean = url.trim().replace(/\/+$/, '');
+  // Strip trailing /docs, /redoc, /openapi.json, /health
+  clean = clean.replace(/\/(docs|redoc|openapi\.json|health)(\/.*)?$/i, '');
+  // Strip trailing /api
+  clean = clean.replace(/\/api(\/.*)?$/i, '');
+  return clean.replace(/\/+$/, '');
+};
+
 /**
  * Resolves the active backend API URL.
  * Priority:
- * 1. User-configured custom URL in localStorage (useful for deployed Vercel frontend pointing to Render)
- * 2. Vite build-time environment variable VITE_API_URL
- * 3. Empty string (falls back to relative path / proxy in local dev)
+ * 1. User-configured custom URL in localStorage (sanitized)
+ * 2. Vite build-time environment variable VITE_API_URL (sanitized)
+ * 3. Live production backend (if running in production browser)
+ * 4. Empty string (falls back to relative path / proxy in local dev)
  */
 export const getActiveApiUrl = () => {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem('weathergpt_custom_api_url');
     if (saved && saved.trim()) {
-      return saved.trim().replace(/\/+$/, '');
+      const clean = sanitizeApiUrl(saved);
+      if (clean !== saved) {
+        localStorage.setItem('weathergpt_custom_api_url', clean);
+      }
+      return clean;
     }
   }
+
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl && envUrl.trim()) {
-    return envUrl.trim().replace(/\/+$/, '');
+    return sanitizeApiUrl(envUrl);
   }
+
+  // If in production on Vercel/cloud and no custom URL configured, default to the deployed backend
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return PRODUCTION_DEFAULT_BACKEND;
+  }
+
   return '';
 };
 
 export const setActiveApiUrl = (url) => {
   if (typeof window !== 'undefined') {
     if (url && url.trim()) {
-      const clean = url.trim().replace(/\/+$/, '');
+      const clean = sanitizeApiUrl(url);
       localStorage.setItem('weathergpt_custom_api_url', clean);
     } else {
       localStorage.removeItem('weathergpt_custom_api_url');

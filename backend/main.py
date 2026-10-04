@@ -105,6 +105,8 @@ async def root():
     }
 
 @app.get("/health", tags=["General"])
+@app.get("/docs/health", include_in_schema=False)
+@app.get("/api/health", include_in_schema=False)
 async def health_check():
     """Health check endpoint validating API configurations."""
     groq_ready = bool(GROQ_API_KEY and GROQ_API_KEY != "your_groq_api_key_here")
@@ -123,6 +125,8 @@ async def health_check():
     }
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["Agent"])
+@app.post("/docs/api/chat", response_model=ChatResponse, include_in_schema=False)
+@app.post("/api/api/chat", response_model=ChatResponse, include_in_schema=False)
 async def chat_with_agent(payload: ChatRequest):
     """
     Primary endpoint for frontend communication.

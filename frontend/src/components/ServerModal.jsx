@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Zap
 } from 'lucide-react';
-import { getActiveApiUrl, setActiveApiUrl, checkBackendHealth } from '../services/api';
+import { getActiveApiUrl, setActiveApiUrl, checkBackendHealth, sanitizeApiUrl } from '../services/api';
 
 export function ServerModal({ isOpen, onClose, onServerUpdated }) {
   const [apiUrl, setApiUrl] = useState('');
@@ -31,7 +31,8 @@ export function ServerModal({ isOpen, onClose, onServerUpdated }) {
     setTesting(true);
     setTestResult(null);
 
-    const targetUrl = apiUrl.trim().replace(/\/+$/, '');
+    const targetUrl = sanitizeApiUrl(apiUrl);
+    setApiUrl(targetUrl); // Auto-update input field to show cleaned base URL!
     try {
       const health = await checkBackendHealth(targetUrl);
       if (health && health.status === 'healthy') {
