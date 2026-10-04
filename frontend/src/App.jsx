@@ -5,7 +5,7 @@ import MapComponent from './components/MapComponent';
 import AnalysisModal from './components/AnalysisModal';
 import ServerModal from './components/ServerModal';
 import { sendChatMessage, checkBackendHealth, getActiveApiUrl } from './services/api';
-import { MessageSquare, Map as MapIcon, ShieldAlert, Sparkles, Navigation } from 'lucide-react';
+import { MessageSquare, Map as MapIcon, Split } from 'lucide-react';
 
 export function App() {
   const [messages, setMessages] = useState([]);
@@ -20,8 +20,8 @@ export function App() {
     weather_api_configured: true
   });
   
-  // Mobile responsive tab view ('chat' or 'map')
-  const [mobileTab, setMobileTab] = useState('chat');
+  // Mobile responsive layout mode: 'dual' (Default: Top Map + Bottom Chat), 'chat' (Full Chat), 'map' (Full Map)
+  const [mobileMode, setMobileMode] = useState('dual');
 
   useEffect(() => {
     // Initial backend health check
@@ -69,10 +69,6 @@ export function App() {
           }
           return prev;
         });
-
-        // NOTE: We do NOT force setMobileTab('map') here anymore!
-        // The user remains in Chat to comfortably read the AI answer,
-        // and can tap "View on Map" anytime to fly there!
       }
     } catch (err) {
       console.error('Chat execution failed:', err);
@@ -94,9 +90,9 @@ export function App() {
 
   const handleSelectLocation = (loc) => {
     setCurrentLocation(loc);
-    // When user explicitly clicks "View on Map" or a location chip, switch to Map on mobile
-    if (window.innerWidth < 768) {
-      setMobileTab('map');
+    // If user was in chat-only view on mobile, open dual view so map is instantly visible
+    if (window.innerWidth < 768 && mobileMode === 'chat') {
+      setMobileMode('dual');
     }
   };
 
@@ -116,52 +112,78 @@ export function App() {
         systemStatus={systemStatus}
       />
 
-      {/* Modern High-Tech Mobile Tab Switcher */}
-      <div className="md:hidden px-3 py-2 bg-slate-950/95 border-b border-slate-800/80 shrink-0">
-        <div className="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold">
+      {/* Modern High-Tech Mobile View Switcher */}
+      <div className="md:hidden px-3 py-1.5 bg-slate-950/95 border-b border-slate-800/80 shrink-0">
+        <div className="flex items-center p-0.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-semibold">
           <button
-            onClick={() => setMobileTab('chat')}
-            className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-              mobileTab === 'chat'
+            onClick={() => setMobileMode('dual')}
+            className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              mobileMode === 'dual'
+                ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-950'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Split className="w-3.5 h-3.5" />
+            <span>Dual View</span>
+          </button>
+
+          <button
+            onClick={() => setMobileMode('chat')}
+            className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              mobileMode === 'chat'
                 ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-950'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            <span>AI Assistant</span>
-            {messages.length > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                mobileTab === 'chat' ? 'bg-cyan-700/60 text-white' : 'bg-slate-800 text-slate-300'
-              }`}>
-                {messages.length}
-              </span>
-            )}
+            <span>Chat Only</span>
           </button>
 
           <button
-            onClick={() => setMobileTab('map')}
-            className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-              mobileTab === 'map'
+            onClick={() => setMobileMode('map')}
+            className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              mobileMode === 'map'
                 ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-950'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <MapIcon className="w-3.5 h-3.5" />
-            <span>Interactive Map</span>
-            {currentLocation && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            )}
+            <span>Map Only</span>
           </button>
         </div>
       </div>
 
-      {/* Main Split Screen Command Center */}
+      {/* Main Command Center: Dual Split on Mobile (Top Map + Bottom Chat), Side-by-Side on Desktop */}
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        {/* Left Panel: AI Weather & Disaster Assistant */}
+        {/* On Mobile: Top Map Section | On Desktop: Right Map Panel */}
+        <section 
+          id="weathergpt-map-section"
+          className={`relative border-slate-800/80 transition-all ${
+            /* Mobile layout classes */
+            mobileMode === 'dual' 
+              ? 'w-full h-[36vh] sm:h-[38vh] border-b order-1 md:order-2 shrink-0 md:h-full md:border-b-0 md:border-l md:w-[60%] xl:w-[64%] flex' 
+              : mobileMode === 'map' 
+                ? 'w-full flex-1 h-full order-1 md:order-2 md:border-l md:w-[60%] xl:w-[64%] flex' 
+                : 'hidden md:flex md:order-2 md:border-l md:w-[60%] xl:w-[64%] md:h-full'
+          }`}
+        >
+          <MapComponent
+            currentLocation={currentLocation}
+            locationHistory={locationHistory}
+            onSelectHistoryCity={handleSelectLocation}
+          />
+        </section>
+
+        {/* On Mobile: Bottom Chat Section | On Desktop: Left Chat Panel */}
         <section 
           id="weathergpt-chat-section"
-          className={`w-full md:w-[46%] lg:w-[40%] xl:w-[36%] h-full flex flex-col shrink-0 ${
-            mobileTab === 'chat' ? 'flex' : 'hidden md:flex'
+          className={`flex-col overflow-hidden transition-all ${
+            /* Mobile layout classes */
+            mobileMode === 'dual' 
+              ? 'w-full flex-1 order-2 md:order-1 md:w-[40%] xl:w-[36%] md:h-full flex' 
+              : mobileMode === 'chat' 
+                ? 'w-full flex-1 h-full order-2 md:order-1 md:w-[40%] xl:w-[36%] flex' 
+                : 'hidden md:flex md:order-1 md:w-[40%] xl:w-[36%] md:h-full'
           }`}
         >
           <ChatInterface
@@ -171,20 +193,6 @@ export function App() {
             onClearHistory={() => setMessages([])}
             onFocusLocation={handleSelectLocation}
             onOpenServer={() => setIsServerOpen(true)}
-          />
-        </section>
-
-        {/* Right Panel: Interactive Leaflet Command Map */}
-        <section 
-          id="weathergpt-map-section"
-          className={`w-full md:w-[54%] lg:w-[60%] xl:w-[64%] h-full relative ${
-            mobileTab === 'map' ? 'flex' : 'hidden md:flex'
-          }`}
-        >
-          <MapComponent
-            currentLocation={currentLocation}
-            locationHistory={locationHistory}
-            onSelectHistoryCity={handleSelectLocation}
           />
         </section>
       </main>

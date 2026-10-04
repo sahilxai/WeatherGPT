@@ -44,17 +44,45 @@ const TILE_LAYERS = {
 };
 
 /**
- * Controller component inside MapContainer to execute smooth flyTo animations
+ * Automatically invalidates Leaflet map size on container resize or layout shift
+ */
+function MapResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const handleResize = () => {
+      try {
+        map.invalidateSize();
+      } catch (e) {
+        // Safe catch
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    const timer = setTimeout(handleResize, 250);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
+    };
+  }, [map]);
+  return null;
+}
+
+/**
+ * Controller component inside MapContainer to execute smooth flyTo animations safely
  */
 function MapController({ location, zoomLevel = 11 }) {
   const map = useMap();
 
   useEffect(() => {
     if (location && typeof location.lat === 'number' && typeof location.lon === 'number') {
-      map.flyTo([location.lat, location.lon], zoomLevel, {
-        duration: 2.2,
-        easeLinearity: 0.25
-      });
+      try {
+        map.invalidateSize();
+        map.flyTo([location.lat, location.lon], zoomLevel, {
+          duration: 1.8,
+          easeLinearity: 0.25
+        });
+      } catch (err) {
+        console.warn('Map flyTo warning:', err);
+      }
     }
   }, [location, zoomLevel, map]);
 
@@ -192,6 +220,7 @@ export function MapComponent({
           />
         )}
 
+        <MapResizeHandler />
         <MapController location={currentLocation} />
 
         {/* Current Active Location Marker */}
@@ -283,68 +312,77 @@ export function MapComponent({
         })}
       </MapContainer>
 
-      {/* Station HUD: Responsive Bottom Sheet on Mobile, Top Left on Desktop */}
+      {/* Station HUD: Compact Pill on Mobile, Full Card on Desktop */}
       {currentLocation ? (
-        <div className="absolute bottom-12 md:bottom-auto md:top-4 left-3 right-3 md:right-auto md:left-4 z-20 pointer-events-auto">
-          <div className="glass-hud rounded-2xl p-3 sm:p-4 shadow-2xl border border-slate-700/80 max-w-full md:max-w-xs transition-all animate-fade-in">
-            {/* Header: Station info */}
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                <div className="min-w-0">
-                  <h2 className="text-xs sm:text-sm font-extrabold text-white tracking-tight leading-none truncate">
-                    {currentLocation.city}
-                  </h2>
-                  <span className="text-[10px] text-slate-400 font-medium font-mono truncate block">
-                    {currentLocation.country || 'Target Region'}
-                  </span>
-                </div>
-              </div>
-              <span className="shrink-0 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-semibold uppercase tracking-wider">
-                Telemetry
-              </span>
+        <>
+          {/* Mobile Split Pill */}
+          <div className="md:hidden absolute top-2.5 left-2.5 z-20 pointer-events-auto max-w-[calc(100%-85px)] animate-fade-in">
+            <div className="glass-hud rounded-xl px-2.5 py-1.5 shadow-lg border border-slate-700/80 flex items-center gap-2 text-xs text-white">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+              <span className="font-bold truncate">{currentLocation.city}</span>
+              <span className="font-mono text-cyan-400 font-bold shrink-0">{currentLocation.temp !== null ? `${currentLocation.temp}°C` : ''}</span>
             </div>
+          </div>
 
-            {/* Main Temperature & Condition Row */}
-            <div className="flex items-center justify-between bg-dark-950/60 p-2 sm:p-2.5 rounded-xl border border-slate-800/80 mb-2">
-              <div>
-                <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight flex items-baseline gap-1">
-                  {currentLocation.temp !== null && currentLocation.temp !== undefined ? `${currentLocation.temp}°` : 'N/A'}
-                  <span className="text-xs text-cyan-400 font-sans font-normal">C</span>
-                </span>
-                <span className="text-[10px] sm:text-[11px] text-cyan-300 font-medium capitalize flex items-center gap-1">
-                  <CloudSun className="w-3 h-3 text-cyan-400 shrink-0" />
-                  <span className="truncate">{currentLocation.condition || 'Atmospheric state'}</span>
+          {/* Desktop Full HUD */}
+          <div className="hidden md:block absolute top-4 left-4 z-20 pointer-events-auto">
+            <div className="glass-hud rounded-2xl p-4 shadow-2xl border border-slate-700/80 max-w-xs transition-all animate-fade-in">
+              <div className="flex items-center justify-between gap-3 mb-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-extrabold text-white tracking-tight leading-none truncate">
+                      {currentLocation.city}
+                    </h2>
+                    <span className="text-[10px] text-slate-400 font-medium font-mono truncate block">
+                      {currentLocation.country || 'Target Region'}
+                    </span>
+                  </div>
+                </div>
+                <span className="shrink-0 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-semibold uppercase tracking-wider">
+                  Telemetry
                 </span>
               </div>
-              {currentLocation.feels_like !== null && (
-                <div className="text-right border-l border-slate-800 pl-3 shrink-0">
-                  <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Feels</span>
-                  <span className="text-xs font-bold text-slate-200 font-mono">
-                    {currentLocation.feels_like}°C
+
+              <div className="flex items-center justify-between bg-dark-950/60 p-2.5 rounded-xl border border-slate-800/80 mb-2.5">
+                <div>
+                  <span className="text-2xl font-black text-white font-mono tracking-tight flex items-baseline gap-1">
+                    {currentLocation.temp !== null && currentLocation.temp !== undefined ? `${currentLocation.temp}°` : 'N/A'}
+                    <span className="text-xs text-cyan-400 font-sans font-normal">C</span>
+                  </span>
+                  <span className="text-[11px] text-cyan-300 font-medium capitalize flex items-center gap-1">
+                    <CloudSun className="w-3 h-3 text-cyan-400 shrink-0" />
+                    <span className="truncate">{currentLocation.condition || 'Atmospheric state'}</span>
                   </span>
                 </div>
-              )}
-            </div>
-
-            {/* Mini Telemetry Metrics Grid */}
-            <div className="grid grid-cols-2 gap-2 text-[10px] sm:text-[11px] font-mono">
-              <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-dark-950/50 border border-slate-800/60 text-slate-300">
-                <Droplets className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span className="truncate">Hum: <strong className="text-white">{currentLocation.humidity ?? 'N/A'}%</strong></span>
+                {currentLocation.feels_like !== null && (
+                  <div className="text-right border-l border-slate-800 pl-3 shrink-0">
+                    <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Feels</span>
+                    <span className="text-xs font-bold text-slate-200 font-mono">
+                      {currentLocation.feels_like}°C
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-dark-950/50 border border-slate-800/60 text-slate-300">
-                <Wind className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-                <span className="truncate">Wind: <strong className="text-white">{currentLocation.wind_speed ?? 'N/A'} m/s</strong></span>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-dark-950/50 border border-slate-800/60 text-slate-300">
+                  <Droplets className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span className="truncate">Hum: <strong className="text-white">{currentLocation.humidity ?? 'N/A'}%</strong></span>
+                </div>
+                <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-dark-950/50 border border-slate-800/60 text-slate-300">
+                  <Wind className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                  <span className="truncate">Wind: <strong className="text-white">{currentLocation.wind_speed ?? 'N/A'} m/s</strong></span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </>
       ) : (
-        <div className="absolute top-3 left-3 right-28 md:right-auto md:top-4 md:left-4 z-20 pointer-events-auto">
-          <div className="glass-hud rounded-xl px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-xl border border-slate-700/80 flex items-center gap-2 text-[11px] sm:text-xs text-slate-300 truncate">
+        <div className="absolute top-2.5 left-2.5 md:top-4 md:left-4 z-20 pointer-events-auto max-w-[calc(100%-85px)] md:max-w-xs">
+          <div className="glass-hud rounded-xl px-2.5 py-1.5 md:px-3.5 md:py-2 shadow-xl border border-slate-700/80 flex items-center gap-2 text-[10px] md:text-xs text-slate-300 truncate">
             <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse shrink-0" />
-            <span className="truncate">Ask about any city in chat to fly map</span>
+            <span className="truncate">Ask in chat to fly map</span>
           </div>
         </div>
       )}

@@ -75,7 +75,7 @@ function getWeatherIcon(conditionText = '') {
 
 // Remove duplicated weather bullet points if the card already shows them
 function extractNarrative(content = '') {
-  if (!content) return '';
+  if (!content || typeof content !== 'string') return '';
   const lines = content.split('\n');
   const filtered = lines.filter(line => {
     const l = line.trim().toLowerCase();
@@ -188,17 +188,18 @@ export function ChatInterface({
         {/* Render Conversation Turns */}
         {!isInitialState && messages.map((msg) => {
           const isUser = msg.role === 'user';
+          const contentStr = typeof msg.content === 'string' ? msg.content : (msg.content ? String(msg.content) : '');
           const hasLocation = Boolean(msg.location && typeof msg.location.lat === 'number');
-          const isError = Boolean(msg.isError || msg.content?.includes('⚠️ Connection Issue') || msg.content?.includes('Could not retrieve weather'));
-          const isEmergency = !isUser && msg.content && (
-            msg.content.toLowerCase().includes('disaster') ||
-            msg.content.toLowerCase().includes('flood') ||
-            msg.content.toLowerCase().includes('cyclone') ||
-            msg.content.toLowerCase().includes('evacuat') ||
-            msg.content.toLowerCase().includes('safety')
+          const isError = Boolean(msg.isError || contentStr.includes('⚠️ Connection Issue') || contentStr.includes('Could not retrieve weather'));
+          const isEmergency = !isUser && contentStr && (
+            contentStr.toLowerCase().includes('disaster') ||
+            contentStr.toLowerCase().includes('flood') ||
+            contentStr.toLowerCase().includes('cyclone') ||
+            contentStr.toLowerCase().includes('evacuat') ||
+            contentStr.toLowerCase().includes('safety')
           );
           
-          const narrative = extractNarrative(msg.content);
+          const narrative = extractNarrative(contentStr);
 
           return (
             <div
