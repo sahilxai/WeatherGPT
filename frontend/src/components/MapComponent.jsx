@@ -22,10 +22,10 @@ import {
 const TILE_LAYERS = {
   dark: {
     name: "Dark Matter (High-Res)",
-    base: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    base: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     labels: null,
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    isDark: false
+    attribution: '&copy; OpenStreetMap contributors',
+    isDark: true
   },
   satellite: {
     name: "Satellite Imagery",

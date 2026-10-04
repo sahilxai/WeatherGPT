@@ -173,6 +173,15 @@
   border: none;
 }
 
+/* OpenStreetMap High-Tech Dark Mode Filter (100% Free, No Watermark, No API Key) */
+.osm-dark-tiles,
+.osm-dark-tiles img,
+.osm-dark-tiles .leaflet-tile,
+.leaflet-layer.osm-dark-tiles,
+.leaflet-layer.osm-dark-tiles img {
+  filter: invert(100%) hue-rotate(180deg) brightness(88%) contrast(115%) saturate(50%) !important;
+}
+
 /* GPU Hardware Acceleration for smooth 60fps/120fps mobile dual view */
 .leaflet-container {
   transform: translateZ(0);
