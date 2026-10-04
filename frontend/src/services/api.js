@@ -1,14 +1,49 @@
 import axios from 'axios';
 
-// The Vite proxy redirects /api to http://127.0.0.1:8000
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+/**
+ * Resolves the active backend API URL.
+ * Priority:
+ * 1. User-configured custom URL in localStorage (useful for deployed Vercel frontend pointing to Render)
+ * 2. Vite build-time environment variable VITE_API_URL
+ * 3. Empty string (falls back to relative path / proxy in local dev)
+ */
+export const getActiveApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('weathergpt_custom_api_url');
+    if (saved && saved.trim()) {
+      return saved.trim().replace(/\/+$/, '');
+    }
+  }
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  return '';
+};
+
+export const setActiveApiUrl = (url) => {
+  if (typeof window !== 'undefined') {
+    if (url && url.trim()) {
+      const clean = url.trim().replace(/\/+$/, '');
+      localStorage.setItem('weathergpt_custom_api_url', clean);
+    } else {
+      localStorage.removeItem('weathergpt_custom_api_url');
+    }
+  }
+};
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  timeout: 60000, // 60s timeout to allow cold-start on free-tier backends (Render)
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000,
+});
+
+// Dynamic interceptor to ensure requests always use current active backend URL
+apiClient.interceptors.request.use((config) => {
+  const currentBase = getActiveApiUrl();
+  config.baseURL = currentBase;
+  return config;
 });
 
 /**
@@ -26,13 +61,41 @@ export const sendChatMessage = async (message, chatHistory = []) => {
         content: m.content
       }))
     });
+
+    // Detect if Vercel returned index.html due to missing backend rewrite or wrong base URL
+    if (typeof res.data === 'string' && (res.data.includes('<!doctype') || res.data.includes('<html'))) {
+      const activeBase = getActiveApiUrl();
+      throw new Error(
+        `Backend API endpoint returned static HTML instead of JSON. ` +
+        (activeBase ? `Please verify backend server at: ${activeBase}` : `Please configure your deployed backend URL in Server Settings.`)
+      );
+    }
+
+    if (!res.data || typeof res.data !== 'object') {
+      throw new Error('Invalid response format received from backend server.');
+    }
+
     return res.data;
   } catch (error) {
     console.error('API Chat Error:', error);
+    const activeBase = getActiveApiUrl();
+
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      throw new Error('Connection timed out. If your backend is hosted on a free cloud tier (like Render), it may be waking up from sleep mode (~50s). Please retry in a moment.');
+    }
+
+    if (error.response?.data?.detail) {
+      throw new Error(error.response.data.detail);
+    }
+
+    if (error.message?.includes('Network Error')) {
+      throw new Error(
+        `Network error: Unable to reach backend server${activeBase ? ` at ${activeBase}` : ''}. Please check if your backend is running or configure the Server URL.`
+      );
+    }
+
     throw new Error(
-      error.response?.data?.detail || 
-      error.message || 
-      'Failed to communicate with WeatherGPT backend.'
+      error.message || 'Failed to communicate with WeatherGPT backend.'
     );
   }
 };
@@ -40,13 +103,14 @@ export const sendChatMessage = async (message, chatHistory = []) => {
 /**
  * Fetch health status of backend, API keys, and ChromaDB state.
  */
-export const checkBackendHealth = async () => {
+export const checkBackendHealth = async (overrideUrl = null) => {
   try {
-    const res = await apiClient.get('/health');
+    const base = overrideUrl !== null ? overrideUrl.replace(/\/+$/, '') : getActiveApiUrl();
+    const res = await axios.get(`${base}/health`, { timeout: 15000 });
     return res.data;
   } catch (error) {
     console.warn('Backend Health Check Failed:', error.message);
-    return { status: 'offline', groq_configured: false, weather_api_configured: false };
+    return { status: 'offline', groq_configured: false, weather_api_configured: false, error: error.message };
   }
 };
 

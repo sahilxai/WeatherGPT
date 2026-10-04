@@ -10,6 +10,13 @@ from backend.rag.ingest import ingest_disaster_documents
 from backend.tools.weather import get_live_weather, get_last_location
 from backend.services.supabase_service import supabase_service
 
+import sys
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Initialize FastAPI Application
 app = FastAPI(
     title="WeatherGPT API",
@@ -17,11 +24,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for frontend connectivity
+# Enable CORS for frontend connectivity across all environments (Vercel, Render, local)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins for local React dev server
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,6 +1,13 @@
 import os
+import sys
 import re
 from typing import List, Dict, Any, Optional
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 from langchain_groq import ChatGroq
 try:
@@ -53,7 +60,7 @@ def create_weather_agent() -> Optional[AgentExecutor]:
     return AgentExecutor(
         agent=agent,
         tools=TOOLS,
-        verbose=True,
+        verbose=False,
         return_intermediate_steps=True,
         handle_parsing_errors=True
     )

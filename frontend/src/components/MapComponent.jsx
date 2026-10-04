@@ -283,42 +283,42 @@ export function MapComponent({
         })}
       </MapContainer>
 
-      {/* Top Left: Ultra-Sleek Glassmorphic Station HUD */}
+      {/* Station HUD: Responsive Bottom Sheet on Mobile, Top Left on Desktop */}
       {currentLocation ? (
-        <div className="absolute top-4 left-4 z-20 pointer-events-auto">
-          <div className="glass-hud rounded-2xl p-4 shadow-2xl border border-slate-700/80 max-w-xs transition-all animate-fade-in">
+        <div className="absolute bottom-12 md:bottom-auto md:top-4 left-3 right-3 md:right-auto md:left-4 z-20 pointer-events-auto">
+          <div className="glass-hud rounded-2xl p-3 sm:p-4 shadow-2xl border border-slate-700/80 max-w-full md:max-w-xs transition-all animate-fade-in">
             {/* Header: Station info */}
-            <div className="flex items-center justify-between gap-3 mb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                <div>
-                  <h2 className="text-sm font-extrabold text-white tracking-tight leading-none">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                <div className="min-w-0">
+                  <h2 className="text-xs sm:text-sm font-extrabold text-white tracking-tight leading-none truncate">
                     {currentLocation.city}
                   </h2>
-                  <span className="text-[10px] text-slate-400 font-medium font-mono">
+                  <span className="text-[10px] text-slate-400 font-medium font-mono truncate block">
                     {currentLocation.country || 'Target Region'}
                   </span>
                 </div>
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-semibold uppercase tracking-wider">
+              <span className="shrink-0 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-semibold uppercase tracking-wider">
                 Telemetry
               </span>
             </div>
 
             {/* Main Temperature & Condition Row */}
-            <div className="flex items-center justify-between bg-dark-950/60 p-2.5 rounded-xl border border-slate-800/80 mb-2.5">
+            <div className="flex items-center justify-between bg-dark-950/60 p-2 sm:p-2.5 rounded-xl border border-slate-800/80 mb-2">
               <div>
-                <span className="text-2xl font-black text-white font-mono tracking-tight flex items-baseline gap-1">
+                <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight flex items-baseline gap-1">
                   {currentLocation.temp !== null && currentLocation.temp !== undefined ? `${currentLocation.temp}°` : 'N/A'}
                   <span className="text-xs text-cyan-400 font-sans font-normal">C</span>
                 </span>
-                <span className="text-[11px] text-cyan-300 font-medium capitalize flex items-center gap-1">
-                  <CloudSun className="w-3 h-3 text-cyan-400" />
-                  {currentLocation.condition || 'Atmospheric state'}
+                <span className="text-[10px] sm:text-[11px] text-cyan-300 font-medium capitalize flex items-center gap-1">
+                  <CloudSun className="w-3 h-3 text-cyan-400 shrink-0" />
+                  <span className="truncate">{currentLocation.condition || 'Atmospheric state'}</span>
                 </span>
               </div>
               {currentLocation.feels_like !== null && (
-                <div className="text-right border-l border-slate-800 pl-3">
+                <div className="text-right border-l border-slate-800 pl-3 shrink-0">
                   <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Feels</span>
                   <span className="text-xs font-bold text-slate-200 font-mono">
                     {currentLocation.feels_like}°C
@@ -328,29 +328,29 @@ export function MapComponent({
             </div>
 
             {/* Mini Telemetry Metrics Grid */}
-            <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+            <div className="grid grid-cols-2 gap-2 text-[10px] sm:text-[11px] font-mono">
               <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-dark-950/50 border border-slate-800/60 text-slate-300">
                 <Droplets className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>Hum: <strong className="text-white">{currentLocation.humidity ?? 'N/A'}%</strong></span>
+                <span className="truncate">Hum: <strong className="text-white">{currentLocation.humidity ?? 'N/A'}%</strong></span>
               </div>
               <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-dark-950/50 border border-slate-800/60 text-slate-300">
                 <Wind className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-                <span>Wind: <strong className="text-white">{currentLocation.wind_speed ?? 'N/A'} m/s</strong></span>
+                <span className="truncate">Wind: <strong className="text-white">{currentLocation.wind_speed ?? 'N/A'} m/s</strong></span>
               </div>
             </div>
           </div>
         </div>
       ) : (
-        <div className="absolute top-4 left-4 z-20 pointer-events-auto">
-          <div className="glass-hud rounded-xl px-3.5 py-2 shadow-xl border border-slate-700/80 flex items-center gap-2.5 text-xs text-slate-300">
-            <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
-            <span>Awaiting inquiry &mdash; Ask about any city to fly map</span>
+        <div className="absolute top-3 left-3 right-28 md:right-auto md:top-4 md:left-4 z-20 pointer-events-auto">
+          <div className="glass-hud rounded-xl px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-xl border border-slate-700/80 flex items-center gap-2 text-[11px] sm:text-xs text-slate-300 truncate">
+            <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse shrink-0" />
+            <span className="truncate">Ask about any city in chat to fly map</span>
           </div>
         </div>
       )}
 
       {/* Top Right: Map Controls Dock */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2.5 pointer-events-auto">
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex flex-col items-end gap-2 pointer-events-auto">
         {/* Layer Style Selector + Radar Overlay */}
         <div className="flex items-center gap-2">
           {/* Radar Overlay Toggle */}
